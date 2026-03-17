@@ -1,0 +1,19 @@
+# Execute a full multi-waypoint mission
+# Goal
+string mission_file
+---
+# Result
+bool success
+uint32 waypoints_completed
+uint32 waypoints_total
+float32 total_time
+float32 total_distance
+string message
+---
+# Feedback
+uint32 current_waypoint_id
+uint32 total_waypoints
+float32 mission_progress    # 0.0 to 1.0
+float32 distance_to_current_wp
+geometry_msgs/PoseStamped current_pose
+string current_state        # e.g., "NAVIGATING", "HOLDING", "REPLANNING"

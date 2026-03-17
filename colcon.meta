@@ -1,0 +1,31 @@
+{
+    "names": {
+        "gps_denied_bringup": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_perception": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_state_estimation": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_mapping": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_planning": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_control": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_safety": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_sim": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        },
+        "gps_denied_interfaces": {
+            "cmake-args": ["-DCMAKE_BUILD_TYPE=Release"]
+        }
+    }
+}

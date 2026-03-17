@@ -1,0 +1,6 @@
+# Load a waypoint mission from file
+string mission_file      # Path to mission YAML file
+---
+bool success
+string message
+gps_denied_interfaces/WaypointList waypoints

@@ -1,0 +1,68 @@
+# === Perception Parameters ===
+perception:
+  camera_topic: "/sensors/camera/color/image_raw"
+  depth_topic: "/sensors/camera/depth/image_raw"
+  max_features: 500
+  scale_factor: 1.2
+  n_levels: 8
+  max_depth_range: 5.0
+  voxel_size: 0.05
+
+# === State Estimation Parameters ===
+state_estimation:
+  vio_algorithm: "vins_fusion"
+  feature_threshold: 30
+  confidence_threshold: 0.3
+  imu_rate: 200
+  keyframe_interval: 0.5
+  max_covariance_position: 1.0
+  relocalization_timeout: 5.0
+
+# === Mapping Parameters ===
+mapping:
+  resolution: 0.10
+  local_map_radius: 8.0
+  insertion_max_range: 5.0
+  obstacle_inflation: 0.3
+  occupancy_threshold: 0.7
+  free_threshold: 0.3
+  map_stale_timeout: 5.0
+
+# === Planning Parameters ===
+planning:
+  algorithm: "rrt_star"
+  planning_horizon: 5.0
+  replan_rate: 5.0
+  goal_tolerance: 0.3
+  max_velocity: 2.0
+  max_acceleration: 1.5
+  max_yaw_rate: 1.0
+  safety_margin: 0.4
+  stuck_timeout: 10.0
+  max_planning_time: 0.15
+  smoothing: "minimum_snap"
+
+# === Control Parameters ===
+control:
+  control_rate: 50
+  offboard_heartbeat_rate: 10
+  position_tracking_kp: 1.5
+  velocity_ff_gain: 0.8
+  max_tracking_error: 1.0
+  trajectory_blend_time: 0.5
+  arm_timeout: 5.0
+
+# === Safety Parameters ===
+safety:
+  vio_confidence_warn: 0.3
+  vio_confidence_critical: 0.1
+  vio_recovery_timeout: 5.0
+  battery_warn_pct: 25.0
+  battery_critical_pct: 15.0
+  heartbeat_timeout: 2.0
+  max_tracking_error: 1.5
+  geofence_x_min: -10.0
+  geofence_x_max: 10.0
+  geofence_y_min: -10.0
+  geofence_y_max: 10.0
+  geofence_z_max: 5.0

@@ -1,0 +1,31 @@
+# Warehouse inspection mission — 3 waypoints
+mission:
+  name: "warehouse_inspection_01"
+  frame_id: "odom"
+  default_speed: 1.5
+  default_tolerance: 0.5
+  waypoints:
+    - id: 1
+      x: 2.0
+      y: 0.0
+      z: 1.5
+      yaw: 0.0
+      tolerance: 0.3
+      hold_time: 2.0
+      label: "aisle_1_start"
+    - id: 2
+      x: 5.0
+      y: 3.0
+      z: 1.5
+      yaw: 1.57
+      tolerance: 0.5
+      hold_time: 2.0
+      label: "aisle_1_end"
+    - id: 3
+      x: 0.0
+      y: 0.0
+      z: 1.5
+      yaw: 0.0
+      tolerance: 0.3
+      hold_time: 0.0
+      label: "return_to_launch"

@@ -1,0 +1,40 @@
+### Build artifacts ###
+build/
+install/
+log/
+
+### Python ###
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+.eggs/
+
+### C++ ###
+*.o
+*.so
+*.dylib
+*.a
+
+### IDE ###
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+### ROS2 ###
+*.bag/
+*.mcap
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Docker ###
+.docker/
+
+### Experiments ###
+experiments/runs/*/bags/
+experiments/runs/*/logs/

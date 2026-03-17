@@ -1,0 +1,4 @@
+# Query all subsystem health statuses
+---
+gps_denied_interfaces/SubsystemHealth[] subsystems
+gps_denied_interfaces/SystemStatus overall_status

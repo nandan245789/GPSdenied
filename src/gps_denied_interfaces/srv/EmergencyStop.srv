@@ -1,0 +1,5 @@
+# Emergency stop — immediate motor kill
+string reason
+---
+bool success
+string message

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>gps_denied_state_estimation</name>
+  <version>0.1.0</version>
+  <description>Visual-inertial odometry (VINS-Fusion) and EKF fusion for GPS-denied pose estimation.</description>
+  <maintainer email="dev@gpsdenied.dev">GPS Denied Dev</maintainer>
+  <license>MIT</license>
+  <depend>rclpy</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>px4_msgs</depend>
+  <depend>gps_denied_interfaces</depend>
+  <test_depend>python3-pytest</test_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>
