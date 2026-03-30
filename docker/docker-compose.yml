@@ -1,0 +1,48 @@
+# GPS-Denied Navigation — Docker Compose
+# Usage: docker compose up sim
+
+services:
+  # Development shell — interactive terminal
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gpsdenied-dev
+    stdin_open: true
+    tty: true
+    privileged: true
+    network_mode: host
+    volumes:
+      - ../src:/workspace/src
+      - ../config:/workspace/config
+      - ../missions:/workspace/missions
+      - ../docs:/workspace/docs
+      - ../scripts:/workspace/scripts
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DOMAIN_ID=0
+      - PX4_SIM_MODEL=gz_x500
+      - PX4_GZ_WORLD=default
+    working_dir: /workspace
+
+  # Simulation — PX4 SITL + Gazebo + all nodes
+  sim:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gpsdenied-sim
+    stdin_open: true
+    tty: true
+    privileged: true
+    network_mode: host
+    volumes:
+      - ../src:/workspace/src
+      - ../config:/workspace/config
+      - ../missions:/workspace/missions
+      - ../scripts:/workspace/scripts
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DOMAIN_ID=0
+      - PX4_SIM_MODEL=gz_x500
+    working_dir: /workspace
+    command: bash /workspace/scripts/launch_sim.sh
