@@ -64,7 +64,7 @@ WORKDIR /opt
 RUN git clone --depth 1 --branch v1.15.2 https://github.com/PX4/PX4-Autopilot.git --recursive \
     && cd PX4-Autopilot \
     && bash ./Tools/setup/ubuntu.sh --no-nuttx \
-    && make px4_sitl gz_x500 || true
+    && DONT_RUN=1 make px4_sitl_default
 
 # ---- Install px4_msgs ----
 WORKDIR /opt/ros2_ws/src
