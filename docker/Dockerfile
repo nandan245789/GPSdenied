@@ -66,6 +66,13 @@ RUN git clone --depth 1 --branch v1.15.2 https://github.com/PX4/PX4-Autopilot.gi
     && bash ./Tools/setup/ubuntu.sh --no-nuttx \
     && DONT_RUN=1 make px4_sitl_default
 
+# ---- Install Micro-XRCE-DDS-Agent (PX4 ↔ ROS2 bridge) ----
+WORKDIR /opt
+RUN git clone --depth 1 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git \
+    && cd Micro-XRCE-DDS-Agent && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    && make -j$(nproc) && make install && ldconfig
+
 # ---- Install px4_msgs ----
 WORKDIR /opt/ros2_ws/src
 RUN git clone --depth 1 --branch release/1.15 https://github.com/PX4/px4_msgs.git \
