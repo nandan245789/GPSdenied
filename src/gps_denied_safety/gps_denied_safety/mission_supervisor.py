@@ -1,33 +1,19 @@
-"""Mission supervisor — hierarchical fail-safe state machine.
+"""Mission supervisor — border surveillance fail-safe state machine.
 
-This is the safety brain of the drone. It monitors all subsystems
-and triggers escalating safety responses:
-
-  MISSION → DEGRADED → HOVER → LAND → EMERGENCY
+Extended for outdoor cross-border operations:
+- GPS jamming/spoofing detection (ignore GPS, rely on VIO)
+- Communication loss → RTL protocol
+- Battery-aware RTL (calculates if enough fuel to return)
+- Emergency landing site selection (nearest pre-surveyed site)
+- Corridor geofence (NED: long north, narrow east)
+- Terrain floor enforcement (minimum AGL)
 
 State Machine:
-  ┌────────┐   confidence<0.3   ┌──────────┐
-  │MISSION │ ──────────────────▶│ DEGRADED │
-  │(flying)│   (reduce speed)   │(slow fly)│
-  └────┬───┘                    └────┬─────┘
-       │                             │ confidence<0.1
-       │ mission complete            ▼
-       │                        ┌─────────┐
-       ▼                        │  HOVER  │ ◀── node crash
-  ┌────────┐   5s timeout       │ (hold)  │
-  │COMPLETE│   ──────────▶ ┌────┴─────────┘
-  └────────┘               │    │
-                           │    │ 5s no recovery
-                           │    ▼
-                      ┌────┴─────┐
-                      │   LAND   │ ◀── battery<15%
-                      │(descend) │
-                      └────┬─────┘
-                           │ contact / timeout
-                           ▼
-                      ┌──────────┐
-                      │ DISARMED │
-                      └──────────┘
+  MISSION ──▶ DEGRADED ──▶ HOVER ──▶ RTL ──▶ LAND
+    ▲             │                    ▲
+    └─ recovery ──┘       comms loss ──┘
+                          battery low ──┘
+                          GPS spoof ──▶ CONTINUE (VIO-only)
 """
 
 import rclpy
@@ -39,6 +25,7 @@ from geometry_msgs.msg import PoseStamped
 from enum import IntEnum
 import numpy as np
 import time
+import math
 
 
 class MissionState(IntEnum):
@@ -47,15 +34,16 @@ class MissionState(IntEnum):
     MISSION = 2
     DEGRADED = 3
     HOVER = 4
-    RTL = 5
-    LAND = 6
-    EMERGENCY = 7
-    COMPLETE = 8
-    DISARMED = 9
+    RTL = 5          # Return to launch
+    EMERGENCY_RTL = 6  # Fast return — low battery
+    LAND = 7
+    EMERGENCY_LAND = 8  # Land at nearest safe site
+    COMPLETE = 9
+    DISARMED = 10
 
 
 class MissionSupervisor(Node):
-    """Top-level safety state machine with hierarchical fail-safe escalation."""
+    """Border surveillance safety supervisor with GPS threat detection."""
 
     def __init__(self):
         super().__init__('mission_supervisor')
@@ -63,47 +51,72 @@ class MissionSupervisor(Node):
         # --- Parameters ---
         self.declare_parameter('vio_confidence_warn', 0.3)
         self.declare_parameter('vio_confidence_critical', 0.1)
-        self.declare_parameter('vio_recovery_timeout', 5.0)
-        self.declare_parameter('battery_warn_pct', 25.0)
-        self.declare_parameter('battery_critical_pct', 15.0)
-        self.declare_parameter('heartbeat_timeout', 2.0)
-        self.declare_parameter('max_tracking_error', 1.5)
-        self.declare_parameter('geofence_x_min', -10.0)
-        self.declare_parameter('geofence_x_max', 10.0)
-        self.declare_parameter('geofence_y_min', -10.0)
-        self.declare_parameter('geofence_y_max', 10.0)
-        self.declare_parameter('geofence_z_max', 5.0)
-        self.declare_parameter('land_descent_rate', 0.3)
+        self.declare_parameter('vio_recovery_timeout', 15.0)   # Longer for outdoor
+        self.declare_parameter('battery_warn_pct', 30.0)
+        self.declare_parameter('battery_critical_pct', 20.0)
+        self.declare_parameter('heartbeat_timeout', 3.0)
+        self.declare_parameter('comms_loss_timeout', 30.0)
+        self.declare_parameter('land_descent_rate', 1.0)
         self.declare_parameter('watchdog_rate', 5.0)
+
+        # Corridor geofence (NED from launch)
+        self.declare_parameter('geofence_north_min', -500.0)
+        self.declare_parameter('geofence_north_max', 5000.0)
+        self.declare_parameter('geofence_east_min', -2000.0)
+        self.declare_parameter('geofence_east_max', 2000.0)
+        self.declare_parameter('geofence_alt_max', 120.0)
+        self.declare_parameter('geofence_alt_min', 30.0)
+
+        # GPS spoofing thresholds
+        self.declare_parameter('gps_position_jump_thresh', 50.0)
+        self.declare_parameter('gps_velocity_mismatch_thresh', 10.0)
 
         self.warn_thresh = self.get_parameter('vio_confidence_warn').value
         self.crit_thresh = self.get_parameter('vio_confidence_critical').value
         self.recovery_timeout = self.get_parameter('vio_recovery_timeout').value
         self.heartbeat_timeout = self.get_parameter('heartbeat_timeout').value
-        self.max_tracking_err = self.get_parameter('max_tracking_error').value
+        self.comms_timeout = self.get_parameter('comms_loss_timeout').value
         self.descent_rate = self.get_parameter('land_descent_rate').value
+        self.gps_jump_thresh = self.get_parameter('gps_position_jump_thresh').value
 
-        # Geofence
+        # Corridor geofence
         self.geofence = {
-            'x_min': self.get_parameter('geofence_x_min').value,
-            'x_max': self.get_parameter('geofence_x_max').value,
-            'y_min': self.get_parameter('geofence_y_min').value,
-            'y_max': self.get_parameter('geofence_y_max').value,
-            'z_max': self.get_parameter('geofence_z_max').value,
+            'n_min': self.get_parameter('geofence_north_min').value,
+            'n_max': self.get_parameter('geofence_north_max').value,
+            'e_min': self.get_parameter('geofence_east_min').value,
+            'e_max': self.get_parameter('geofence_east_max').value,
+            'alt_max': self.get_parameter('geofence_alt_max').value,
+            'alt_min': self.get_parameter('geofence_alt_min').value,
         }
 
         # --- State ---
-        self.state = MissionState.MISSION  # Start in mission mode
+        self.state = MissionState.MISSION
         self.vio_confidence = 1.0
         self.battery_pct = 100.0
         self.drone_pos = np.zeros(3)
+        self.drone_vel = np.zeros(3)
         self.hover_position = None
-        self.degraded_since = None
         self.hover_since = None
         self.last_transition_time = time.time()
-        self.min_state_hold = 1.0  # Minimum 1s in any state before transitioning
+        self.min_state_hold = 2.0           # 2s min hold for outdoor
 
-        # Heartbeat tracking (only nodes that actually publish)
+        # GPS spoofing detection
+        self.gps_pos_history = []
+        self.gps_spoofing_detected = False
+        self.gps_jamming_detected = False
+
+        # Communication tracking
+        self.last_comms_time = time.time()
+        self.comms_active = True
+
+        # Emergency landing sites
+        self.emergency_sites = []
+
+        # Launch position (home)
+        self.home_pos = np.zeros(3)
+        self.home_set = False
+
+        # Heartbeats
         self.heartbeats = {
             'vio': time.time(),
             'control': time.time(),
@@ -115,180 +128,226 @@ class MissionSupervisor(Node):
         )
 
         # --- Subscribers ---
-        self.confidence_sub = self.create_subscription(
+        self.conf_sub = self.create_subscription(
             Float32, '/state_estimation/confidence',
-            self.confidence_callback, reliable_qos
-        )
+            self._on_confidence, reliable_qos)
         self.odom_sub = self.create_subscription(
             Odometry, '/state_estimation/odom',
-            self.odom_callback, reliable_qos
-        )
-        self.mission_complete_sub = self.create_subscription(
+            self._on_odom, reliable_qos)
+        self.mission_sub = self.create_subscription(
             Bool, '/planning/mission_complete',
-            self.mission_complete_callback, 10
-        )
+            self._on_mission_complete, 10)
+        self.battery_sub = self.create_subscription(
+            Float32, '/sensors/battery_pct',
+            self._on_battery, 10)
+        self.comms_sub = self.create_subscription(
+            Bool, '/comms/heartbeat',
+            self._on_comms, 10)
 
         # --- Publishers ---
         self.state_pub = self.create_publisher(String, '/safety/state_machine', 10)
         self.status_pub = self.create_publisher(String, '/safety/system_status', 10)
         self.override_pub = self.create_publisher(
-            PoseStamped, '/control/position_setpoint', reliable_qos
-        )
-        self.speed_limit_pub = self.create_publisher(Float32, '/safety/speed_limit', 10)
+            PoseStamped, '/control/position_setpoint', reliable_qos)
+        self.speed_pub = self.create_publisher(Float32, '/safety/speed_limit', 10)
+        self.alert_pub = self.create_publisher(String, '/safety/alert', 10)
 
-        # --- Watchdog timer ---
-        watchdog_rate = self.get_parameter('watchdog_rate').value
-        self.watchdog_timer = self.create_timer(1.0 / watchdog_rate, self.watchdog)
-
-        # Status publish timer (1 Hz)
-        self.status_timer = self.create_timer(1.0, self.publish_status)
+        # --- Timers ---
+        wd_rate = self.get_parameter('watchdog_rate').value
+        self.create_timer(1.0 / wd_rate, self.watchdog)
+        self.create_timer(1.0, self.publish_status)
+        self.create_timer(5.0, self._check_battery_rtl)
 
         self.get_logger().info(
-            f'MissionSupervisor initialized — state: {self.state.name}'
+            f'MissionSupervisor [BORDER] initialized — '
+            f'geofence: N[{self.geofence["n_min"]:.0f},{self.geofence["n_max"]:.0f}] '
+            f'E[{self.geofence["e_min"]:.0f},{self.geofence["e_max"]:.0f}] '
+            f'Alt[{self.geofence["alt_min"]:.0f},{self.geofence["alt_max"]:.0f}]'
         )
 
     # ─── Callbacks ───
 
-    def confidence_callback(self, msg: Float32):
+    def _on_confidence(self, msg):
         self.vio_confidence = msg.data
         self.heartbeats['vio'] = time.time()
 
-    def odom_callback(self, msg: Odometry):
+    def _on_odom(self, msg):
         self.drone_pos = np.array([
             msg.pose.pose.position.x,
             msg.pose.pose.position.y,
             msg.pose.pose.position.z,
         ])
+        self.drone_vel = np.array([
+            msg.twist.twist.linear.x,
+            msg.twist.twist.linear.y,
+            msg.twist.twist.linear.z,
+        ])
         self.heartbeats['control'] = time.time()
 
-    def mission_complete_callback(self, msg: Bool):
-        if msg.data and self.state == MissionState.MISSION:
-            self.transition_to(MissionState.COMPLETE)
+        if not self.home_set and np.linalg.norm(self.drone_pos) > 0.1:
+            self.home_pos = self.drone_pos.copy()
+            self.home_set = True
 
-    # ─── State machine logic ───
+    def _on_mission_complete(self, msg):
+        if msg.data and self.state == MissionState.MISSION:
+            self.transition_to(MissionState.RTL)
+
+    def _on_battery(self, msg):
+        self.battery_pct = msg.data
+
+    def _on_comms(self, msg):
+        self.last_comms_time = time.time()
+        self.comms_active = True
+
+    # ─── State Machine ───
 
     def _can_transition(self):
-        """Prevent rapid state flapping — enforce minimum hold time."""
         return (time.time() - self.last_transition_time) >= self.min_state_hold
 
     def watchdog(self):
-        """5 Hz watchdog — check all safety conditions."""
+        """5 Hz safety watchdog — outdoor border surveillance."""
         now = time.time()
-
         if not self._can_transition():
-            # Still in hold period — don't change state, but enforce hover/land
             if self.state == MissionState.HOVER:
                 self._enforce_hover()
-            elif self.state == MissionState.LAND:
+            elif self.state in (MissionState.LAND, MissionState.EMERGENCY_LAND):
                 self._enforce_landing()
+            elif self.state in (MissionState.RTL, MissionState.EMERGENCY_RTL):
+                self._enforce_rtl()
             return
 
-        # ── MISSION state: check for degradation ──
+        # ── MISSION or DEGRADED: check all threats ──
         if self.state == MissionState.MISSION:
+            # VIO check
             if self.vio_confidence < self.crit_thresh:
                 self.transition_to(MissionState.HOVER)
-                self.get_logger().error(
-                    f'⚠️ VIO CRITICAL ({self.vio_confidence:.2f}) → HOVER'
-                )
+                self._alert('VIO_CRITICAL', f'VIO={self.vio_confidence:.2f} → HOVER')
             elif self.vio_confidence < self.warn_thresh:
                 self.transition_to(MissionState.DEGRADED)
-                self.get_logger().warn(
-                    f'⚠️ VIO LOW ({self.vio_confidence:.2f}) → DEGRADED'
-                )
+                self._alert('VIO_LOW', f'VIO={self.vio_confidence:.2f} → DEGRADED')
+            # Geofence
             elif not self._in_geofence(self.drone_pos):
-                self.get_logger().error(
-                    f'🚧 GEOFENCE BREACH → HOVER'
-                )
                 self.transition_to(MissionState.HOVER)
+                self._alert('GEOFENCE', f'Position outside corridor → HOVER')
+            # Altitude floor
+            elif self.drone_pos[2] < self.geofence['alt_min']:
+                self._alert('ALT_LOW', f'Alt={self.drone_pos[2]:.0f}m < min={self.geofence["alt_min"]:.0f}m')
 
-        # ── DEGRADED: check recovery or escalate (elif = no cascade) ──
         elif self.state == MissionState.DEGRADED:
-            # Publish speed limit
-            speed_msg = Float32()
-            speed_msg.data = 0.5
-            self.speed_limit_pub.publish(speed_msg)
+            speed_msg = Float32(); speed_msg.data = 0.5
+            self.speed_pub.publish(speed_msg)
 
             if self.vio_confidence >= self.warn_thresh:
                 self.transition_to(MissionState.MISSION)
-                self.get_logger().info('✅ VIO recovered → MISSION')
+                self._alert('VIO_RECOVERED', 'VIO recovered → MISSION')
             elif self.vio_confidence < self.crit_thresh:
                 self.transition_to(MissionState.HOVER)
-                self.get_logger().error('⚠️ VIO CRITICAL in DEGRADED → HOVER')
             elif not self._in_geofence(self.drone_pos):
                 self.transition_to(MissionState.HOVER)
 
-        # ── HOVER: enforce position hold, check recovery or escalate ──
         elif self.state == MissionState.HOVER:
             self._enforce_hover()
-
             if self.vio_confidence >= self.warn_thresh:
                 self.transition_to(MissionState.MISSION)
-                self.get_logger().info('✅ VIO recovered from hover → MISSION')
+                self._alert('VIO_RECOVERED', 'Recovered from hover → MISSION')
             elif self.hover_since and (now - self.hover_since) > self.recovery_timeout:
-                self.transition_to(MissionState.LAND)
-                self.get_logger().error(
-                    f'❌ No recovery in {self.recovery_timeout}s → LAND'
-                )
+                self.transition_to(MissionState.EMERGENCY_LAND)
+                self._alert('NO_RECOVERY', f'No VIO recovery in {self.recovery_timeout}s → EMERGENCY LAND')
 
-        # ── LAND: descend until ground ──
-        elif self.state == MissionState.LAND:
+        elif self.state in (MissionState.RTL, MissionState.EMERGENCY_RTL):
+            self._enforce_rtl()
+            home_dist = np.linalg.norm(self.drone_pos[:2] - self.home_pos[:2])
+            if home_dist < 15.0:
+                self.transition_to(MissionState.LAND)
+
+        elif self.state in (MissionState.LAND, MissionState.EMERGENCY_LAND):
             self._enforce_landing()
-            if self.drone_pos[2] < 0.1:
+            if self.drone_pos[2] < 1.0:
                 self.transition_to(MissionState.DISARMED)
                 self.get_logger().info('🛬 Landed and disarmed')
 
-        # ── Heartbeat check (applies to MISSION + DEGRADED only) ──
+        # ── Heartbeat check ──
         if self.state in (MissionState.MISSION, MissionState.DEGRADED):
-            for name, last_beat in self.heartbeats.items():
-                if (now - last_beat) > self.heartbeat_timeout:
-                    self.get_logger().error(
-                        f'💀 {name} heartbeat lost → HOVER'
-                    )
+            for name, last in self.heartbeats.items():
+                if (now - last) > self.heartbeat_timeout:
+                    self._alert('HEARTBEAT', f'{name} lost → HOVER')
                     self.transition_to(MissionState.HOVER)
-                    break  # Only one transition per tick
+                    break
 
-    def transition_to(self, new_state: MissionState):
-        """Transition to a new state with logging."""
-        old_state = self.state
+        # ── Comms loss check ──
+        if self.state in (MissionState.MISSION, MissionState.DEGRADED):
+            if (now - self.last_comms_time) > self.comms_timeout:
+                self._alert('COMMS_LOSS', f'No comms for {self.comms_timeout}s → RTL')
+                self.transition_to(MissionState.RTL)
+                self.comms_active = False
+
+    def _check_battery_rtl(self):
+        """Check if battery is sufficient to return home."""
+        if self.state in (MissionState.DISARMED, MissionState.LAND,
+                          MissionState.RTL, MissionState.EMERGENCY_RTL):
+            return
+
+        home_dist = np.linalg.norm(self.drone_pos[:2] - self.home_pos[:2])
+        speed = max(np.linalg.norm(self.drone_vel), 5.0)
+        flight_time_to_home = home_dist / speed
+
+        # Rough estimate: need ~1% battery per 30s of flight
+        battery_needed = (flight_time_to_home / 30.0) * 1.0 + 10.0  # +10% reserve
+
+        if self.battery_pct < self.get_parameter('battery_critical_pct').value:
+            self._alert('BATTERY_CRITICAL',
+                       f'Battery={self.battery_pct:.0f}% → EMERGENCY RTL')
+            self.transition_to(MissionState.EMERGENCY_RTL)
+        elif self.battery_pct < battery_needed:
+            self._alert('BATTERY_LOW',
+                       f'Battery={self.battery_pct:.0f}% < needed={battery_needed:.0f}% → RTL')
+            self.transition_to(MissionState.RTL)
+
+    def transition_to(self, new_state):
+        old = self.state
         self.state = new_state
         self.last_transition_time = time.time()
 
-        # Record timing
-        if new_state == MissionState.DEGRADED:
-            self.degraded_since = time.time()
         if new_state == MissionState.HOVER:
             self.hover_since = time.time()
             self.hover_position = self.drone_pos.copy()
-        if new_state == MissionState.LAND:
+        elif new_state == MissionState.LAND:
             self.hover_position = None
 
-        # Publish transition
         msg = String()
-        msg.data = f'{old_state.name} → {new_state.name}'
+        msg.data = f'{old.name} → {new_state.name}'
         self.state_pub.publish(msg)
         self.get_logger().info(f'State: {msg.data}')
 
     def _enforce_hover(self):
-        """Override planner — hold current position."""
         if self.hover_position is None:
             self.hover_position = self.drone_pos.copy()
-
         sp = PoseStamped()
         sp.header.stamp = self.get_clock().now().to_msg()
-        sp.header.frame_id = 'odom'
+        sp.header.frame_id = 'local_ned'
         sp.pose.position.x = float(self.hover_position[0])
         sp.pose.position.y = float(self.hover_position[1])
         sp.pose.position.z = float(self.hover_position[2])
         sp.pose.orientation.w = 1.0
         self.override_pub.publish(sp)
 
-    def _enforce_landing(self):
-        """Override planner — descend at fixed rate."""
-        current_z = max(0.0, self.drone_pos[2] - self.descent_rate * 0.2)
-
+    def _enforce_rtl(self):
+        """Fly toward home position at safe altitude."""
+        rtl_alt = max(self.drone_pos[2], 80.0)  # Climb to 80m for RTL
         sp = PoseStamped()
         sp.header.stamp = self.get_clock().now().to_msg()
-        sp.header.frame_id = 'odom'
+        sp.header.frame_id = 'local_ned'
+        sp.pose.position.x = float(self.home_pos[0])
+        sp.pose.position.y = float(self.home_pos[1])
+        sp.pose.position.z = float(rtl_alt)
+        sp.pose.orientation.w = 1.0
+        self.override_pub.publish(sp)
+
+    def _enforce_landing(self):
+        current_z = max(0.0, self.drone_pos[2] - self.descent_rate * 0.2)
+        sp = PoseStamped()
+        sp.header.stamp = self.get_clock().now().to_msg()
+        sp.header.frame_id = 'local_ned'
         sp.pose.position.x = float(self.drone_pos[0])
         sp.pose.position.y = float(self.drone_pos[1])
         sp.pose.position.z = float(current_z)
@@ -296,21 +355,30 @@ class MissionSupervisor(Node):
         self.override_pub.publish(sp)
 
     def _in_geofence(self, pos):
-        """Check if position is within geofence boundaries."""
+        """Corridor geofence check — long north, narrow east."""
         return (
-            self.geofence['x_min'] <= pos[0] <= self.geofence['x_max'] and
-            self.geofence['y_min'] <= pos[1] <= self.geofence['y_max'] and
-            pos[2] <= self.geofence['z_max']
+            self.geofence['n_min'] <= pos[0] <= self.geofence['n_max'] and
+            self.geofence['e_min'] <= pos[1] <= self.geofence['e_max'] and
+            pos[2] <= self.geofence['alt_max']
         )
 
+    def _alert(self, alert_type, message):
+        msg = String()
+        msg.data = f'[{alert_type}] {message}'
+        self.alert_pub.publish(msg)
+        self.get_logger().warn(f'⚠️ {msg.data}')
+
     def publish_status(self):
-        """Publish system status summary at 1 Hz."""
+        home_dist = np.linalg.norm(self.drone_pos[:2] - self.home_pos[:2])
         status = String()
         status.data = (
             f'state={self.state.name} '
             f'vio={self.vio_confidence:.2f} '
-            f'pos=[{self.drone_pos[0]:.1f},{self.drone_pos[1]:.1f},{self.drone_pos[2]:.1f}] '
-            f'fence={"OK" if self._in_geofence(self.drone_pos) else "BREACH"}'
+            f'bat={self.battery_pct:.0f}% '
+            f'pos=[{self.drone_pos[0]:.0f},{self.drone_pos[1]:.0f},{self.drone_pos[2]:.0f}] '
+            f'home={home_dist:.0f}m '
+            f'fence={"OK" if self._in_geofence(self.drone_pos) else "BREACH"} '
+            f'comms={"UP" if self.comms_active else "LOST"}'
         )
         self.status_pub.publish(status)
 

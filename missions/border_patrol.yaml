@@ -1,0 +1,116 @@
+# Border surveillance patrol — 6-waypoint perimeter route
+# GPS-denied operation: assumes GPS jamming/spoofing in operational area
+# Coordinates in local NED frame relative to launch point (meters)
+
+mission:
+  name: "border_patrol_sector_alpha"
+  type: "surveillance_patrol"
+  classification: "restricted"
+  frame_id: "local_ned"
+
+  # Launch point reference (for logging only — not used for navigation)
+  launch_reference:
+    description: "Forward operating base"
+
+  # Operating parameters
+  cruise_altitude_m: 60.0       # AGL — terrain following
+  cruise_speed_ms: 8.0          # 8 m/s ≈ 29 km/h
+  max_speed_ms: 15.0            # Emergency sprint speed
+  loiter_radius_m: 50.0         # Orbit radius for surveillance loiter
+  terrain_follow_agl: 60.0      # Maintain this height above ground
+
+  # Corridor geofence (NED meters from launch)
+  geofence:
+    north_max: 5000.0
+    north_min: -500.0
+    east_max: 2000.0
+    east_min: -2000.0
+    altitude_max_agl: 120.0     # Max 120m AGL
+    altitude_min_agl: 30.0      # Min 30m AGL (safety floor)
+
+  waypoints:
+    # WP1: Climb and transit to patrol start
+    - id: 1
+      north: 500.0              # 500m north
+      east: 0.0
+      alt_agl: 60.0             # 60m above ground
+      speed: 8.0
+      tolerance: 15.0           # 15m arrival tolerance (outdoor)
+      hold_time: 0.0
+      action: "transit"
+      label: "patrol_start"
+
+    # WP2: Begin border sweep — camera ON
+    - id: 2
+      north: 2000.0             # 2km north
+      east: -500.0              # 500m west of centerline
+      alt_agl: 60.0
+      speed: 6.0                # Slow for surveillance
+      tolerance: 15.0
+      hold_time: 0.0
+      action: "surveillance_sweep"
+      camera_mode: "continuous_record"
+      label: "sweep_start"
+
+    # WP3: Midpoint — loiter for area scan
+    - id: 3
+      north: 3000.0             # 3km north
+      east: 0.0
+      alt_agl: 80.0             # Higher for wider FOV
+      speed: 5.0
+      tolerance: 20.0
+      hold_time: 60.0           # 60s loiter — full area scan
+      action: "loiter_scan"
+      camera_mode: "360_scan"
+      loiter_orbits: 2          # 2 full orbits
+      label: "observation_point"
+
+    # WP4: Continue sweep along border
+    - id: 4
+      north: 4000.0             # 4km north
+      east: 500.0               # 500m east (zigzag pattern)
+      alt_agl: 60.0
+      speed: 6.0
+      tolerance: 15.0
+      hold_time: 0.0
+      action: "surveillance_sweep"
+      camera_mode: "continuous_record"
+      label: "sweep_east"
+
+    # WP5: Turn-around point — deepest penetration
+    - id: 5
+      north: 4500.0             # 4.5km — furthest point
+      east: 0.0
+      alt_agl: 60.0
+      speed: 5.0
+      tolerance: 20.0
+      hold_time: 30.0           # Brief observation
+      action: "loiter_scan"
+      camera_mode: "thermal_scan"
+      label: "turnaround"
+
+    # WP6: Return to base — fast transit
+    - id: 6
+      north: 0.0
+      east: 0.0
+      alt_agl: 80.0             # Higher for safe return
+      speed: 12.0               # Fast return
+      tolerance: 10.0
+      hold_time: 0.0
+      action: "rtl"
+      label: "return_to_base"
+
+  # Contingency waypoints (pre-planned emergency landing sites)
+  emergency_landing_sites:
+    - id: "ELS_1"
+      north: 1000.0
+      east: 200.0
+      description: "Flat clearing 1km north"
+    - id: "ELS_2"
+      north: 2500.0
+      east: -100.0
+      description: "Road intersection 2.5km"
+    - id: "ELS_3"
+      north: 0.0
+      east: 0.0
+      description: "Launch point (home)"

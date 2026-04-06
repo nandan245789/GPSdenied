@@ -22,6 +22,7 @@ setup(
             'feature_extractor = gps_denied_perception.feature_extractor:main',
             'depth_processor = gps_denied_perception.depth_processor:main',
             'obstacle_detector = gps_denied_perception.obstacle_detector:main',
+            'surveillance_manager = gps_denied_perception.surveillance_manager:main',
         ],
     },
 )

@@ -15,5 +15,6 @@ setup(
         'vio_node = gps_denied_state_estimation.vio_node:main',
         'px4_vision_bridge = gps_denied_state_estimation.px4_vision_bridge:main',
         'ground_truth_comparator = gps_denied_state_estimation.ground_truth_comparator:main',
+        'terrain_matcher = gps_denied_state_estimation.terrain_matcher:main',
     ]},
 )
