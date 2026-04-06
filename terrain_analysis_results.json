@@ -1,0 +1,346 @@
+{
+  "nadir": {
+    "topdownSET1": {
+      "n_frames_total": 157,
+      "n_frames_sampled": 32,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 8990.6,
+        "std": 1771.3
+      },
+      "edge_density": {
+        "mean": 31.86,
+        "std": 2.04
+      },
+      "terrain_distribution": {
+        "barren_soil": 27,
+        "mixed_suburban": 5
+      },
+      "matching": {
+        "mean_matches": 24.0,
+        "mean_ratio": 1.2,
+        "min_matches": 4,
+        "max_matches": 120
+      },
+      "gps_coverage": {
+        "n_geotagged": 32,
+        "lat_range": [
+          15.832612,
+          15.834483
+        ],
+        "lon_range": [
+          74.400085,
+          74.403642
+        ],
+        "alt_range": [
+          831.4,
+          831.8
+        ]
+      },
+      "feature_poor_frames": []
+    },
+    "topdownSET2": {
+      "n_frames_total": 170,
+      "n_frames_sampled": 34,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 9350.8,
+        "std": 2936.3
+      },
+      "edge_density": {
+        "mean": 32.71,
+        "std": 1.65
+      },
+      "terrain_distribution": {
+        "mixed_suburban": 6,
+        "barren_soil": 24,
+        "mixed": 4
+      },
+      "matching": {
+        "mean_matches": 15.0,
+        "mean_ratio": 0.7,
+        "min_matches": 2,
+        "max_matches": 70
+      },
+      "gps_coverage": {
+        "n_geotagged": 34,
+        "lat_range": [
+          15.82947,
+          15.834482
+        ],
+        "lon_range": [
+          74.400388,
+          74.40469
+        ],
+        "alt_range": [
+          831.3,
+          833.5
+        ]
+      },
+      "feature_poor_frames": []
+    },
+    "topdownSET3": {
+      "n_frames_total": 175,
+      "n_frames_sampled": 35,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 8851.3,
+        "std": 3053.8
+      },
+      "edge_density": {
+        "mean": 30.7,
+        "std": 4.28
+      },
+      "terrain_distribution": {
+        "barren_soil": 25,
+        "mixed_suburban": 9,
+        "dense_vegetation": 1
+      },
+      "matching": {
+        "mean_matches": 16.0,
+        "mean_ratio": 0.8,
+        "min_matches": 1,
+        "max_matches": 88
+      },
+      "gps_coverage": {
+        "n_geotagged": 35,
+        "lat_range": [
+          15.830652,
+          15.834293
+        ],
+        "lon_range": [
+          74.400112,
+          74.404653
+        ],
+        "alt_range": [
+          831.4,
+          831.8
+        ]
+      },
+      "feature_poor_frames": []
+    }
+  },
+  "oblique": {
+    "3d 60M": {
+      "n_frames_total": 156,
+      "n_frames_sampled": 32,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 7499.2,
+        "std": 2037.7
+      },
+      "edge_density": {
+        "mean": 31.16,
+        "std": 2.86
+      },
+      "terrain_distribution": {
+        "barren_soil": 14,
+        "mixed": 5,
+        "mixed_suburban": 12,
+        "dense_vegetation": 1
+      },
+      "matching": {
+        "mean_matches": 17.0,
+        "mean_ratio": 0.8,
+        "min_matches": 3,
+        "max_matches": 83
+      },
+      "gps_coverage": {
+        "n_geotagged": 32,
+        "lat_range": [
+          15.830637,
+          15.833125
+        ],
+        "lon_range": [
+          74.40009,
+          74.404265
+        ],
+        "alt_range": [
+          833.1,
+          834.0
+        ]
+      },
+      "feature_poor_frames": []
+    },
+    "3d 60M-1": {
+      "n_frames_total": 180,
+      "n_frames_sampled": 30,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 7803.5,
+        "std": 1684.9
+      },
+      "edge_density": {
+        "mean": 31.8,
+        "std": 2.25
+      },
+      "terrain_distribution": {
+        "barren_soil": 17,
+        "mixed_suburban": 11,
+        "mixed": 2
+      },
+      "matching": {
+        "mean_matches": 24.0,
+        "mean_ratio": 1.2,
+        "min_matches": 6,
+        "max_matches": 293
+      },
+      "gps_coverage": {
+        "n_geotagged": 30,
+        "lat_range": [
+          15.829425,
+          15.834267
+        ],
+        "lon_range": [
+          74.39996,
+          74.402538
+        ],
+        "alt_range": [
+          833.5,
+          834.2
+        ]
+      },
+      "feature_poor_frames": []
+    },
+    "3d 60M-2": {
+      "n_frames_total": 155,
+      "n_frames_sampled": 31,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 7637.4,
+        "std": 1810.2
+      },
+      "edge_density": {
+        "mean": 31.31,
+        "std": 2.54
+      },
+      "terrain_distribution": {
+        "mixed_suburban": 12,
+        "barren_soil": 14,
+        "mixed": 4,
+        "urban": 1
+      },
+      "matching": {
+        "mean_matches": 32.0,
+        "mean_ratio": 1.6,
+        "min_matches": 4,
+        "max_matches": 408
+      },
+      "gps_coverage": {
+        "n_geotagged": 31,
+        "lat_range": [
+          15.830637,
+          15.833165
+        ],
+        "lon_range": [
+          74.400068,
+          74.404235
+        ],
+        "alt_range": [
+          833.2,
+          834.2
+        ]
+      },
+      "feature_poor_frames": []
+    },
+    "3d 60M-3": {
+      "n_frames_total": 182,
+      "n_frames_sampled": 31,
+      "features": {
+        "mean": 2000.0,
+        "std": 0.0,
+        "min": 2000,
+        "max": 2000,
+        "pct_above_500": 100.0
+      },
+      "texture": {
+        "mean": 7554.0,
+        "std": 1537.8
+      },
+      "edge_density": {
+        "mean": 30.8,
+        "std": 2.58
+      },
+      "terrain_distribution": {
+        "barren_soil": 18,
+        "mixed_suburban": 8,
+        "mixed": 5
+      },
+      "matching": {
+        "mean_matches": 17.0,
+        "mean_ratio": 0.9,
+        "min_matches": 3,
+        "max_matches": 77
+      },
+      "gps_coverage": {
+        "n_geotagged": 31,
+        "lat_range": [
+          15.829887,
+          15.834652
+        ],
+        "lon_range": [
+          74.400843,
+          74.404352
+        ],
+        "alt_range": [
+          833.6,
+          834.0
+        ]
+      },
+      "feature_poor_frames": []
+    }
+  },
+  "summary": {
+    "viability_score": 71.0,
+    "feature_score": 40.0,
+    "matching_score": 1.0,
+    "diversity_score": 15.0,
+    "gps_score": 15,
+    "avg_features": 2000.0,
+    "avg_match_ratio": 1.0,
+    "terrain_types": {
+      "barren_soil": 139,
+      "mixed_suburban": 63,
+      "mixed": 20,
+      "dense_vegetation": 2,
+      "urban": 1
+    },
+    "verdict": "GOOD"
+  }
+}
